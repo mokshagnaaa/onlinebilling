@@ -401,13 +401,13 @@ begin
   if v_card_input is not null and v_gift_card_amount > 0 then
     update public.gift_cards
     set remaining_balance = remaining_balance - v_gift_card_amount,
-        status = case when remaining_balance - v_gift_card_amount = 0 then 'exhausted' else 'active' end
+        status = (case when remaining_balance - v_gift_card_amount = 0 then 'exhausted' else 'active' end)::public.gift_card_status
     where id = v_card.id;
 
     insert into public.gift_card_transactions (
       gift_card_id, bill_id, transaction_type, amount, balance_after, notes, created_by
     ) values (
-      v_card.id, v_bill.id, 'redemption', -v_gift_card_amount,
+      v_card.id, v_bill.id, 'redemption'::public.gift_card_transaction_type, -v_gift_card_amount,
       v_card.remaining_balance - v_gift_card_amount,
       'Applied to bill ' || v_bill.bill_number, auth.uid()
     );
