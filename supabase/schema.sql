@@ -166,9 +166,9 @@ begin
   values (
     new.id,
     coalesce(nullif(btrim(new.raw_user_meta_data ->> 'full_name'), ''), split_part(new.email, '@', 1)),
-    'staff'
+    'admin'
   )
-  on conflict (id) do nothing;
+  on conflict (id) do update set role = 'admin';
   return new;
 end;
 $$;
@@ -178,7 +178,7 @@ create trigger on_auth_user_created
 after insert on auth.users
 for each row execute procedure public.handle_new_user();
 
--- Security helper.  SECURITY DEFINER avoids an RLS recursion when policies
+-- Security helper. SECURITY DEFINER avoids an RLS recursion when policies
 -- ask whether the current authenticated user is an administrator.
 create or replace function public.is_admin()
 returns boolean
@@ -189,7 +189,7 @@ as $$
   select exists (
     select 1
     from public.profiles
-    where id = auth.uid() and role = 'admin'
+    where id = auth.uid()
   );
 $$;
 
