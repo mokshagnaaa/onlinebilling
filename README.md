@@ -1,10 +1,10 @@
-# Glamour Touch Beauty Billing
+# Uhaas Beauty Studio Billing
 
-A full React + Vite beauty-parlour billing application with a pink-and-plum UI, Supabase Auth, PostgreSQL data storage, Row Level Security, atomic gift-card redemption, invoice printing/PDF download, reports, and a browser-only demo mode.
+A full React + Vite beauty-studio billing application with a green-and-white UI, Supabase Auth, PostgreSQL data storage, Row Level Security, atomic gift-card redemption, invoice printing/PDF download, reports, and a browser-only demo mode.
 
 ## What is included
 
-- Secure email/password registration, login, email confirmation, reset-password flow, logout, and profile/password updates.
+- Supabase-backed email/password registration and login, email confirmation, password-reset links, logout, and profile/password updates.
 - Dashboard figures that are calculated from saved bills and line items.
 - Service catalogue with price editing and active/inactive status.
 - Normal/custom-service billing, automatic totals, line discounts, invoice preview, printing, and PDF download.
@@ -34,7 +34,7 @@ A full React + Vite beauty-parlour billing application with a pink-and-plum UI, 
    npm.cmd run dev
    ```
 
-5. Open the localhost URL Vite displays.
+5. Open the localhost URL Vite displays. `npm.cmd start` starts the same frontend server if you prefer the standard start command.
 
 Without `.env.local`, the login screen provides **Explore the live demo**. It is intentionally browser-only and lets you verify the UI and every workflow before connecting Supabase.
 
@@ -42,6 +42,8 @@ Without `.env.local`, the login screen provides **Explore the live demo**. It is
 
 1. Create a new Supabase project.
 2. In **SQL Editor**, paste and run [`supabase/schema.sql`](supabase/schema.sql).
+
+If the database was set up before bill deletion or gift-card number collision handling was added, run the updated schema again so the transactional functions and their permissions are installed. Gift card issuance now skips card numbers that already exist, so cards can continue to be generated safely on an existing database.
 3. In **Authentication → URL Configuration**, set:
 
    - Site URL: your production URL, for example `https://your-app.vercel.app`
@@ -60,7 +62,7 @@ Without `.env.local`, the login screen provides **Explore the live demo**. It is
 
 6. From **Project Settings → API**, copy your Project URL and publishable key into `.env.local` as `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
 
-### Configure mail / OTP links
+### Configure authentication email
 
 Configure a custom SMTP provider in **Authentication → SMTP Settings** if you need production delivery. Put SMTP credentials only in Supabase's server-side dashboard—not in `.env.local`, Git, or the React source. Use the email templates there for confirmation and password-reset links. The included app uses Supabase Auth's secure email verification and reset links.
 

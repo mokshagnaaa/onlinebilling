@@ -247,7 +247,15 @@ begin
     raise exception 'Gift card value must be greater than zero' using errcode = '22023';
   end if;
 
-  v_card_number := 'V' || nextval('public.gift_card_number_seq')::text;
+  loop
+    v_card_number := 'V' || nextval('public.gift_card_number_seq')::text;
+    exit when not exists (
+      select 1
+      from public.gift_cards
+      where upper(card_number) = upper(v_card_number)
+    );
+  end loop;
+
   insert into public.gift_cards (
     card_number, original_value, remaining_balance, status, created_by
   ) values (
@@ -417,6 +425,68 @@ begin
 end;
 $$;
 
+create or replace function public.delete_bill(p_bill_id uuid)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_bill public.bills;
+  v_card public.gift_cards;
+  v_restored_balance numeric(12,2);
+  v_refund_count integer;
+begin
+  perform public.require_admin();
+
+  select * into v_bill
+  from public.bills
+  where id = p_bill_id
+  for update;
+  if not found then
+    raise exception 'Bill not found' using errcode = 'P0002';
+  end if;
+
+  if v_bill.gift_card_id is not null and v_bill.gift_card_amount > 0 then
+    select * into v_card
+    from public.gift_cards
+    where id = v_bill.gift_card_id
+    for update;
+    if not found then
+      raise exception 'Gift card for this bill was not found' using errcode = 'P0002';
+    end if;
+
+    v_restored_balance := v_card.remaining_balance + v_bill.gift_card_amount;
+    if v_restored_balance > v_card.original_value then
+      raise exception 'Gift card balance cannot be restored safely' using errcode = '22023';
+    end if;
+
+    update public.gift_cards
+    set remaining_balance = v_restored_balance,
+        status = case
+          when status = 'disabled' then 'disabled'::public.gift_card_status
+          else 'active'::public.gift_card_status
+        end
+    where id = v_card.id;
+
+    update public.gift_card_transactions
+    set bill_id = null,
+        transaction_type = 'refund'::public.gift_card_transaction_type,
+        amount = abs(amount),
+        balance_after = v_restored_balance,
+        notes = 'Refund for deleted bill ' || v_bill.bill_number
+    where bill_id = v_bill.id
+      and gift_card_id = v_card.id
+      and transaction_type = 'redemption';
+    get diagnostics v_refund_count = row_count;
+    if v_refund_count <> 1 then
+      raise exception 'Gift card redemption record could not be restored safely' using errcode = '22023';
+    end if;
+  end if;
+
+  delete from public.bills where id = v_bill.id;
+end;
+$$;
+
 -- All totals are calculated from stored bills, never browser-side running
 -- counters. Dates are inclusive and use the bill's India-local calendar day.
 create or replace function public.get_dashboard_metrics(
@@ -548,11 +618,13 @@ grant select on public.bills, public.bill_items, public.gift_cards, public.gift_
 revoke all on function public.set_profile_role(uuid, public.app_role) from public;
 revoke all on function public.create_gift_card(numeric) from public;
 revoke all on function public.create_bill(jsonb, text, timestamptz) from public;
+revoke all on function public.delete_bill(uuid) from public;
 revoke all on function public.get_dashboard_metrics(date, date) from public;
 revoke all on function public.get_report_summary(date, date) from public;
 grant execute on function public.set_profile_role(uuid, public.app_role) to authenticated;
 grant execute on function public.create_gift_card(numeric) to authenticated;
 grant execute on function public.create_bill(jsonb, text, timestamptz) to authenticated;
+grant execute on function public.delete_bill(uuid) to authenticated;
 grant execute on function public.get_dashboard_metrics(date, date) to authenticated;
 grant execute on function public.get_report_summary(date, date) to authenticated;
 
